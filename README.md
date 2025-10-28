@@ -1,25 +1,39 @@
 # Terrain Mapping Drone Control
 
-This ROS2 package implements a drone control system for terrain mapping using ORBSLAM3 and PX4 SITL simulation.
+A ROS2 package for autonomous drone control with gimbal-stabilized camera and visual feature tracking capabilities using PX4 SITL simulation.
 
 <img width="2116" height="1400" alt="image" src="https://github.com/user-attachments/assets/364db4bc-b407-41a7-8543-53ef024b3cda" />
 
 ## Overview
 
-The package provides a setting for a PX4-powered drone in a planetary surface terrain. The drone can capture images with its gimbaled camera. Perseverance Rover model (static) is available in the world, for autonomous mapping and landing experiments. 
+This package provides a complete simulation environment for testing terrain mapping and visual feature tracking algorithms. It uses a PX4-powered X500 quadcopter with a 3-axis gimbal camera in a Gazebo simulation with realistic terrain models.
 
-### Experiments Possible
+### Key Features
 
-- Automated takeoff and landing
-- Integration with ORBSLAM3 for real-time mapping
+- **Spiral Trajectory Controller**: Autonomous takeoff, descending spiral pattern (configurable diameter and descent rate), and landing
+- **Gimbal Control**: Active gimbal stabilization to maintain camera pointing at ground target during flight
+- **ORB Feature Tracking**: Real-time visual feature detection, tracking, and matching between consecutive frames
+- **Pose Visualization**: RViz-compatible 3D visualization of drone pose with coordinate frame markers
+- **Terrain Models**: Includes high-resolution planetary surface terrain meshes for realistic simulation
+- **Bridge Infrastructure**: Complete ROS2-Gazebo topic bridging for camera, gimbal, and control interfaces
+
+### Applications
+
+- Visual odometry and SLAM algorithm testing
+- Feature-based navigation research
+- Gimbal control algorithm development
+- Autonomous terrain mapping mission planning
+- Computer vision algorithm validation
   
 ## Prerequisites
 
 - ROS2 Humble
-- PX4 SITL Simulator
-- ORBSLAM3 ROS2 package
-- OpenCV
+- PX4 SITL Simulator (with Gazebo)
+- `px4_msgs` package
+- `ros_gz_bridge` package
+- OpenCV and `cv_bridge`
 - Python 3.8+
+- Additional Python packages: `transforms3d`, `numpy`
 
 ## Installation
 
@@ -47,63 +61,138 @@ source ~/ros2_ws/install/setup.bash
 
 ## Usage
 
-1. Launch the complete system (PX4 SITL, ORBSLAM3, and the controller):
+### Basic Launch
+
+Launch the complete simulation environment (PX4 SITL, Gazebo terrain, and ROS2 bridges):
 ```bash
 ros2 launch terrain_mapping_drone_control terrain_mapping.launch.py
 ```
 
-### Manual Camera Bridge Setup
-If you need to manually bridge the Gazebo camera topics to ROS2, you can use the following commands:
+This will:
+- Start PX4 SITL with X500 gimbal-equipped drone
+- Spawn the terrain model in Gazebo
+- Launch ROS2-Gazebo topic bridges for camera and gimbal control
+
+### Running Individual Nodes
+
+**Spiral Trajectory Controller:**
 ```bash
-# Bridge RGB camera
-ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image@gz.msgs.Image
+ros2 run terrain_mapping_drone_control spiral_trajectory
+```
+The drone will:
+1. Arm and switch to offboard mode
+2. Take off to 20m altitude
+3. Execute a descending spiral pattern (35m diameter)
+4. Point gimbal at center/takeoff position throughout flight
+5. Land when reaching 5m altitude
 
-# Bridge depth camera
-ros2 run ros_gz_bridge parameter_bridge /depth_camera@sensor_msgs/msg/Image@gz.msgs.Image
+**Feature Tracker:**
+```bash
+ros2 run terrain_mapping_drone_control feature_tracker
+```
+Subscribes to `/drone_camera` and publishes annotated images with ORB features to `/feature_tracking/annotated_image`
 
-# Bridge camera info
-ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo
+**Pose Visualizer:**
+```bash
+ros2 run terrain_mapping_drone_control pose_visualizer
+```
+Publishes drone pose markers to `/drone/visualization_marker_array` for RViz visualization
 
-# Bridge point cloud
-ros2 run ros_gz_bridge parameter_bridge /depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloud
+### Visualization
+
+**View camera feed with feature tracking:**
+```bash
+ros2 run rqt_image_view rqt_image_view /feature_tracking/annotated_image
 ```
 
-2. Monitor the progress:
+**RViz visualization:**
 ```bash
-ros2 topic echo /terrain_mapping_controller/status
+rviz2 -d $(ros2 pkg prefix terrain_mapping_drone_control)/share/terrain_mapping_drone_control/config/drone_viz.rviz
 ```
 
-3. View the ORBSLAM3 visualization:
+**Monitor drone position:**
 ```bash
-ros2 run rqt_image_view rqt_image_view
+ros2 topic echo /fmu/out/vehicle_odometry
 ```
 
 ## Configuration
 
-The package behavior can be configured through the following files:
+### Spiral Trajectory Parameters
 
-- `config/terrain_mapping_params.yaml`: Main configuration file for flight parameters
-- `config/camera_calibration.yaml`: Camera calibration parameters for ORBSLAM3
-- `launch/terrain_mapping.launch.py`: Launch file configuration
+Edit `spiral_trajectory.py` to modify flight behavior:
 
-### Key Parameters
+```python
+self.INITIAL_HEIGHT = 20.0       # Takeoff altitude (meters)
+self.SPIRAL_DIAMETER = 35.0      # Diameter of spiral pattern (meters)
+self.DESCENT_RATE = 0.5          # Vertical descent speed (m/s)
+self.SPIRAL_PERIOD = 10.0        # Time for one complete revolution (seconds)
+self.MIN_HEIGHT = 5.0            # Minimum altitude before landing (meters)
+```
 
-- `mapping_height`: Flight altitude in meters
-- `survey_speed`: Drone velocity during mapping
-- `area_length`: Length of the survey area (X direction)
-- `area_width`: Width of the survey area (Y direction)
-- `strip_spacing`: Distance between parallel survey lines
+### Feature Tracker Parameters
 
-## Output
+Edit `feature_tracker.py` to adjust ORB detection:
 
-The system generates the following outputs:
+```python
+nfeatures=500          # Maximum number of features to detect
+scaleFactor=1.2        # Scale factor between pyramid levels
+nlevels=8              # Number of pyramid levels
+fastThreshold=20       # FAST detector threshold
+```
 
-1. ORBSLAM3 trajectory and map data
-2. Flight telemetry logs
-3. Captured images
-4. Generated point cloud of the terrain
+### Launch Configuration
 
-Data is saved to the path specified in the configuration file.
+Key parameters in `terrain_mapping.launch.py`:
+
+- `PX4_GZ_MODEL_POSE`: Initial drone spawn position (x, y, z, roll, pitch, yaw)
+- Terrain model path and orientation
+- ROS2-Gazebo topic bridge mappings
+
+## Package Structure
+
+```
+terrain_mapping_drone_control/
+├── config/
+│   ├── drone_viz.rviz              # RViz configuration
+│   └── terrain_mapping_params.yaml # Flight parameters
+├── launch/
+│   ├── terrain_mapping.launch.py   # Main launch file
+│   └── visualization.launch.py     # RViz visualization
+├── models/
+│   └── terrain/                    # Terrain mesh models
+│       ├── meshes/
+│       │   └── artburysol175.obj   # High-res terrain mesh (67MB)
+│       └── model.sdf               # Gazebo model definition
+├── terrain_mapping_drone_control/
+│   ├── spiral_trajectory.py        # Spiral descent controller
+│   ├── feature_tracker.py          # ORB feature detection/tracking
+│   └── pose_visualizer.py          # Pose visualization
+├── scripts/
+│   └── spiral_trajectory           # Executable script
+├── package.xml
+├── setup.py
+└── README.md
+```
+
+## ROS2 Topics
+
+### Published Topics
+
+- `/fmu/in/offboard_control_mode` - Offboard control mode commands
+- `/fmu/in/trajectory_setpoint` - Position/velocity setpoints
+- `/fmu/in/vehicle_command` - Vehicle commands (arm, disarm, mode changes)
+- `/model/x500_gimbal_0/command/gimbal_*` - Gimbal control (pitch, roll, yaw)
+- `/feature_tracking/annotated_image` - Camera feed with ORB features visualized
+- `/drone/visualization_marker_array` - RViz markers for drone pose
+- `/drone/pose_with_covariance` - Pose with covariance for navigation stack
+
+### Subscribed Topics
+
+- `/fmu/out/vehicle_odometry` - Drone position and orientation
+- `/fmu/out/vehicle_status` - Vehicle status information
+- `/drone_camera` - RGB camera images from Gazebo
+- `/drone_depth_camera` - Depth camera images from Gazebo
+- `/drone_camera_info` - Camera calibration information
 
 ## License
 
