@@ -1,19 +1,18 @@
 # Terrain Mapping Drone Control
 
-This ROS2 package implements a drone control system for terrain mapping of the Bishop Fault Scarp using ORBSLAM3 and PX4 SITL simulation.
+This ROS2 package implements a drone control system for terrain mapping using ORBSLAM3 and PX4 SITL simulation.
+
+<img width="2116" height="1400" alt="image" src="https://github.com/user-attachments/assets/364db4bc-b407-41a7-8543-53ef024b3cda" />
 
 ## Overview
 
-The package provides a controller that guides a PX4-powered drone in a lawnmower pattern over the Bishop Fault Scarp area while maintaining a constant height. The drone captures images that are processed by ORBSLAM3 for simultaneous localization and mapping (SLAM).
+The package provides a setting for a PX4-powered drone in a planetary surface terrain. The drone can capture images with its gimbaled camera. Perseverance Rover model (static) is available in the world, for autonomous mapping and landing experiments. 
 
-### Key Features
+### Experiments Possible
 
 - Automated takeoff and landing
-- Lawnmower pattern trajectory generation for complete area coverage
 - Integration with ORBSLAM3 for real-time mapping
-- Configurable survey parameters (height, speed, area dimensions)
-- Automatic return to launch point after survey completion
-
+  
 ## Prerequisites
 
 - ROS2 Humble
